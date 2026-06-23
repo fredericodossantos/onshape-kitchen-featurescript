@@ -24,18 +24,8 @@ import(path : "onshape/std/properties.fs", version : "2985.0");
 // ---------------------------------------------------------------------------
 function addBox(context is Context, id is Id, c1 is Vector, c2 is Vector, col is Color)
 {
-    // Reordena para garantir corner1 < corner2 em cada componente.
-    const lo = vector(
-        min(c1[0], c2[0]),
-        min(c1[1], c2[1]),
-        min(c1[2], c2[2])
-    );
-    const hi = vector(
-        max(c1[0], c2[0]),
-        max(c1[1], c2[1]),
-        max(c1[2], c2[2])
-    );
-    fCuboid(context, id, { "corner1" : lo, "corner2" : hi });
+    // emitPart sempre passa c1 < c2 em cada eixo (dims positivos) -> usa direto.
+    fCuboid(context, id, { "corner1" : c1, "corner2" : c2 });
     setProperty(context, {
         "entities"     : qCreatedBy(id, EntityType.BODY),
         "propertyType" : PropertyType.APPEARANCE,
@@ -69,11 +59,33 @@ const BR_TK_SET    = 50.0;    // toeKick setback BR (mm)
 // ---------------------------------------------------------------------------
 // Enums de entrada
 // ---------------------------------------------------------------------------
-enum KCProfile { HB, BR15, BR18, BR20 }
-enum KCFront   { SOBREPOSTA, EMBUTIDA }
-enum KCZoneType { PORTA, NICHO }
-enum KCMao     { ESQ, DIR }
-enum KCDoors   { ONE, TWO }
+export enum KCProfile
+{
+    annotation { "Name" : "HB (19mm)" } HB,
+    annotation { "Name" : "BR 15mm" } BR15,
+    annotation { "Name" : "BR 18mm" } BR18,
+    annotation { "Name" : "BR 20mm" } BR20
+}
+export enum KCFront
+{
+    annotation { "Name" : "Sobreposta" } SOBREPOSTA,
+    annotation { "Name" : "Embutida" } EMBUTIDA
+}
+export enum KCZoneType
+{
+    annotation { "Name" : "Porta" } PORTA,
+    annotation { "Name" : "Nicho (prateleiras)" } NICHO
+}
+export enum KCMao
+{
+    annotation { "Name" : "Esquerda" } ESQ,
+    annotation { "Name" : "Direita" } DIR
+}
+export enum KCDoors
+{
+    annotation { "Name" : "1 porta" } ONE,
+    annotation { "Name" : "2 portas" } TWO
+}
 
 // ---------------------------------------------------------------------------
 // Cores (L3 inline _L3_MAT)
@@ -133,14 +145,14 @@ function frontGeom(s is map, ov is map) returns map
     if (s.frontInset)
     {
         const ir = s.insetReveal;
-        const toVal = has(ov, "to") ? ov["to"] : -ir;
-        const boVal = has(ov, "bo") ? ov["bo"] : -ir;
+        const toVal = (ov["to"] != undefined) ? ov["to"] : -ir;
+        const boVal = (ov["bo"] != undefined) ? ov["bo"] : -ir;
         return { "ft" : ft, "lo" : -ir, "ro" : -ir, "to" : toVal, "bo" : boVal, "cy" : ft / 2.0 };
     }
 
     // overlay
-    const toVal = has(ov, "to") ? ov["to"] : (ft - s.revTop);
-    const boVal = has(ov, "bo") ? ov["bo"] : (ft - s.revBot);
+    const toVal = (ov["to"] != undefined) ? ov["to"] : (ft - s.revTop);
+    const boVal = (ov["bo"] != undefined) ? ov["bo"] : (ft - s.revBot);
     return {
         "ft" : ft,
         "lo" : ft - s.revLeft,
@@ -351,7 +363,7 @@ export const kitchenCabinet = defineFeature(function(context is Context, id is I
         isLength(definition.rodapeAltura, { (millimeter) : [0.0, 100.0, 300.0] } as LengthBoundSpec);
 
         // --- Zonas (array de itens) ---
-        annotation { "Name" : "Zonas", "Item name" : "Zona", "UIHint" : UIHint.PREVENT_ARRAY_REORDER }
+        annotation { "Name" : "Zonas", "Item name" : "Zona" }
         definition.zonas is array;
         for (var zona in definition.zonas)
         {
@@ -361,7 +373,7 @@ export const kitchenCabinet = defineFeature(function(context is Context, id is I
             annotation { "Name" : "Altura automática (preenche o resto)" }
             zona.auto is boolean;
 
-            annotation { "Name" : "Altura da zona", "UIHint" : UIHint.SHOW_EXPRESSION }
+            annotation { "Name" : "Altura da zona" }
             isLength(zona.zonaAltura, { (millimeter) : [1.0, 400.0, 3000.0] } as LengthBoundSpec);
 
             annotation { "Name" : "Portas" }
@@ -438,9 +450,9 @@ export const kitchenCabinet = defineFeature(function(context is Context, id is I
                 else
                     fixedSum += z.zonaAltura / millimeter;
             }
-            // Divisórias ocupam mt cada, entre zonas adjacentes (nZonas-1 fronteiras).
-            const divSpace = (nZonas > 1) ? (nZonas - 1) * mt : 0.0;
-            const autoH = (nAuto > 0) ? (corpoH - fixedSum - divSpace) / nAuto : 0.0;
+            // PARIDADE com model.js: autoH NAO desconta divisoria. Os slots sao contiguos
+            // e a divisoria fica SOBRE a fronteira (centrada em z0). (oraculo confirma)
+            const autoH = (nAuto > 0) ? (corpoH - fixedSum) / nAuto : 0.0;
 
             // Montar lista de slots (zTop → zBase, topo para base).
             // Cada slot: { zh, zoneIdx } onde zh = altura em mm.
@@ -467,11 +479,7 @@ export const kitchenCabinet = defineFeature(function(context is Context, id is I
                     const zhItem = slotHeights[si];
                     const z0slot = zTop - zhItem;
                     slotZ0s = append(slotZ0s, z0slot);
-                    // Após o slot, subtrai a divisória se não for o último slot.
-                    if (si < nSlotsCalc - 1)
-                        zTop = z0slot - mt;  // divisória de mt entre zonas (sempre em v1)
-                    else
-                        zTop = z0slot;
+                    zTop = z0slot;  // slots CONTIGUOS (model.js: zTop -= zh, sem -mt); divisoria sobrepoe a fronteira
                 }
             }
 

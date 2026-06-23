@@ -1,0 +1,9 @@
+[
+  {"btType": "BTMParameterQuantity-147", "parameterId": "largura", "expression": "914.4 millimeter"},
+  {"btType": "BTMParameterQuantity-147", "parameterId": "altura", "expression": "876.3 millimeter"},
+  {"btType": "BTMParameterQuantity-147", "parameterId": "profundidade", "expression": "587.37 millimeter"},
+  {"btType": "BTMParameterQuantity-147", "parameterId": "rodapeAltura", "expression": "100 millimeter"},
+  {"btType": "BTMParameterEnum-145", "parameterId": "perfil", "enumName": "KCProfile", "value": "HB"},
+  {"btType": "BTMParameterEnum-145", "parameterId": "frente", "enumName": "KCFront", "value": "SOBREPOSTA"},
+  {"btType": "BTMParameterArray-2025", "parameterId": "zonas", "items": []}
+]
